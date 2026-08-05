@@ -26,6 +26,11 @@ type AuthContextValue = {
   refreshUser: () => Promise<void>;
 };
 
+type AuthResponse = {
+  user: AuthUser;
+  token?: string;
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -34,9 +39,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const data = await apiFetch<{ user: AuthUser }>("/api/auth/me");
+      // Ensure token exists before attempting refresh
+      const token = typeof window !== "undefined" ? localStorage.getItem("cinehub_token") : null;
+      if (!token) {
+        setUser(null);
+        return;
+      }
+  
+      const data = await apiFetch<AuthResponse>("/api/auth/me");
       setUser(data.user);
     } catch {
+      localStorage.removeItem("cinehub_token");
       setUser(null);
     }
   }, []);
@@ -58,37 +71,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const data = await apiFetch<{ user: AuthUser }>("/api/auth/login", {
+    const data = await apiFetch<AuthResponse>("/api/auth/login", {
       method: "POST",
       body: { email, password },
     });
   
+    if (data.token) {
+      localStorage.setItem("cinehub_token", data.token);
+    }
     setUser(data.user);
   }, []);
 
   const register = useCallback(
-    async (input: {
-      name: string;
-      username: string;
-      email: string;
-      password: string;
-    }) => {
-      const data = await apiFetch<{ user: AuthUser }>("/api/auth/register", {
+    async (input: { name: string; username: string; email: string; password: string }) => {
+      const data = await apiFetch<AuthResponse>("/api/auth/register", {
         method: "POST",
         body: input,
       });
   
+      if (data.token) {
+        localStorage.setItem("cinehub_token", data.token);
+      }
       setUser(data.user);
     },
     []
   );
 
   const logout = useCallback(async () => {
-    await apiFetch("/api/auth/logout", {
-      method: "POST",
-    });
-  
-    setUser(null);
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore logout network errors
+    } finally {
+      localStorage.removeItem("cinehub_token");
+      setUser(null);
+    }
   }, []);
 
   const value = useMemo(
