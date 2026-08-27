@@ -1,4 +1,3 @@
-// app/profile/movies/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,6 +5,7 @@ import Link from "next/link";
 import EmptyState from "@/components/profile/EmptyState";
 import ProfileTabs from "@/components/profile/ProfileTabs";
 import { Film, Plus, Star, MessageSquare, Trash2, Edit3, ExternalLink, X } from "lucide-react";
+import { GENRES } from "@/constants/genres";
 
 export default function MyMoviesPage() {
   const [movies, setMovies] = useState<any[]>([]);
@@ -13,9 +13,19 @@ export default function MyMoviesPage() {
 
   // Edit Modal State
   const [editingMovie, setEditingMovie] = useState<any | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editYear, setEditYear] = useState<number | string>("");
-  const [editRuntime, setEditRuntime] = useState<number | string>("");
+  const [editForm, setEditForm] = useState({
+    title: "",
+    year: "",
+    runtime: "",
+    posterUrl: "",
+    synopsis: "",
+    country: "",
+    director: "",
+    trailer: "",
+    genres: [] as string[],
+    platform: "",
+    platformLink: "",
+  });
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   useEffect(() => {
@@ -58,7 +68,6 @@ export default function MyMoviesPage() {
       );
 
       if (res.ok) {
-        // Remove the deleted movie from state using normalized ID matching
         setMovies((prev) => prev.filter((movie) => (movie.id || movie._id) !== id));
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -70,12 +79,30 @@ export default function MyMoviesPage() {
     }
   }
 
-  // 2. OPEN EDIT MODAL
+  // 2. OPEN EDIT MODAL (Populate all fields)
   function handleOpenEdit(movie: any) {
     setEditingMovie(movie);
-    setEditTitle(movie.title || "");
-    setEditYear(movie.year || "");
-    setEditRuntime(movie.runtime || "");
+
+    // Extract raw genre strings array safely
+    const extractedGenres: string[] = Array.isArray(movie.genres)
+      ? movie.genres.map((g: any) => (typeof g === "string" ? g : g.genre?.name || g.name)).filter(Boolean)
+      : [];
+
+    const mainPlatform = movie.platforms && movie.platforms.length > 0 ? movie.platforms[0] : null;
+
+    setEditForm({
+      title: movie.title || "",
+      year: movie.year ? String(movie.year) : "",
+      runtime: movie.runtime ? String(movie.runtime) : "",
+      posterUrl: movie.posterUrl || movie.poster || "",
+      synopsis: movie.synopsis || "",
+      country: movie.country || "",
+      director: movie.director || "",
+      trailer: movie.trailer || "",
+      genres: extractedGenres,
+      platform: mainPlatform?.name || "",
+      platformLink: mainPlatform?.link || "",
+    });
   }
 
   // 3. SUBMIT EDIT ACTION
@@ -86,6 +113,22 @@ export default function MyMoviesPage() {
     const movieId = editingMovie.id || editingMovie._id;
     setSubmittingEdit(true);
 
+    const payload = {
+      title: editForm.title,
+      year: Number(editForm.year),
+      runtime: editForm.runtime ? Number(editForm.runtime) : undefined,
+      posterUrl: editForm.posterUrl || undefined,
+      synopsis: editForm.synopsis || undefined,
+      country: editForm.country || undefined,
+      director: editForm.director || undefined,
+      trailer: editForm.trailer || undefined,
+      genres: editForm.genres,
+      platforms:
+        editForm.platform && editForm.platformLink
+          ? [{ name: editForm.platform, link: editForm.platformLink }]
+          : [],
+    };
+
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/movies/${movieId}`,
@@ -93,19 +136,22 @@ export default function MyMoviesPage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            title: editTitle,
-            year: Number(editYear),
-            runtime: Number(editRuntime),
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
       if (res.ok) {
+        const updatedMovieData = await res.json().catch(() => null);
+
         setMovies((prev) =>
           prev.map((m) =>
             (m.id || m._id) === movieId
-              ? { ...m, title: editTitle, year: Number(editYear), runtime: Number(editRuntime) }
+              ? {
+                  ...m,
+                  ...payload,
+                  // Keep server response structure or optimistic state
+                  ...(updatedMovieData?.movie || updatedMovieData || {}),
+                }
               : m
           )
         );
@@ -186,7 +232,7 @@ export default function MyMoviesPage() {
             {movies.map((movie) => {
               const movieId = movie.id || movie._id;
               const genres =
-                movie.genres?.map((g: any) => g.genre?.name || g.name).filter(Boolean).join(", ") ||
+                movie.genres?.map((g: any) => (typeof g === "string" ? g : g.genre?.name || g.name)).filter(Boolean).join(", ") ||
                 "Non classé";
               const posterSrc = movie.posterUrl || movie.poster || "/images/default-movie.jpg";
 
@@ -209,7 +255,7 @@ export default function MyMoviesPage() {
                           {movie.year}
                         </span>
                       </div>
-                      <p className="text-xs text-muted">
+                      <p className="text-xs text-muted mt-1">
                         {genres} {movie.runtime ? `• ${movie.runtime} min` : ""}
                       </p>
                     </div>
@@ -217,7 +263,6 @@ export default function MyMoviesPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    {/* VOIR: Navigates to Movie Details */}
                     <Link
                       href={`/movies/${movieId}`}
                       className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent"
@@ -226,7 +271,6 @@ export default function MyMoviesPage() {
                       Voir
                     </Link>
 
-                    {/* MODIFIER: Opens inline edit modal */}
                     <button
                       onClick={() => handleOpenEdit(movie)}
                       className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent"
@@ -235,7 +279,6 @@ export default function MyMoviesPage() {
                       Modifier
                     </button>
 
-                    {/* SUPPRIMER: Triggers delete request */}
                     <button
                       onClick={() => handleDeleteMovie(movieId)}
                       className="flex items-center gap-1.5 rounded-lg border border-border p-2 text-xs font-medium text-muted hover:border-red-500 hover:text-red-500"
@@ -259,11 +302,11 @@ export default function MyMoviesPage() {
         )}
       </div>
 
-      {/* EDIT MODAL */}
+      {/* COMPLETE EDIT MODAL */}
       {editingMovie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="relative w-full max-w-lg rounded-xl bg-surface p-6 border border-border">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-surface p-6 border border-border my-8">
+            <div className="flex items-center justify-between border-b border-border pb-3 sticky top-0 bg-surface z-10">
               <h3 className="text-lg font-bold text-white">Modifier : {editingMovie.title}</h3>
               <button onClick={() => setEditingMovie(null)} className="text-muted hover:text-white">
                 <X size={20} />
@@ -271,25 +314,31 @@ export default function MyMoviesPage() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="mt-4 space-y-4">
+              {/* Titre */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-white">Titre du film</label>
+                <label className="block text-sm font-medium mb-1 text-white">
+                  Titre du film <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full rounded-md border border-border bg-elevated p-2 text-sm text-white"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Année & Durée */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-white">Année</label>
+                  <label className="block text-sm font-medium mb-1 text-white">
+                    Année <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
-                    value={editYear}
-                    onChange={(e) => setEditYear(e.target.value)}
-                    className="w-full rounded-md border border-border bg-elevated p-2 text-sm text-white"
+                    value={editForm.year}
+                    onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
                     required
                   />
                 </div>
@@ -297,25 +346,134 @@ export default function MyMoviesPage() {
                   <label className="block text-sm font-medium mb-1 text-white">Durée (minutes)</label>
                   <input
                     type="number"
-                    value={editRuntime}
-                    onChange={(e) => setEditRuntime(e.target.value)}
-                    className="w-full rounded-md border border-border bg-elevated p-2 text-sm text-white"
+                    value={editForm.runtime}
+                    onChange={(e) => setEditForm({ ...editForm, runtime: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Genres */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-white">Genres</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto rounded-md border border-border bg-elevated p-3">
+                  {GENRES.map((g) => {
+                    const isSelected = editForm.genres.includes(g);
+                    return (
+                      <label key={g} className="flex items-center gap-2 text-xs text-white cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...editForm.genres, g]
+                              : editForm.genres.filter((item) => item !== g);
+                            setEditForm({ ...editForm, genres: updated });
+                          }}
+                          className="rounded border-border text-accent focus:ring-0"
+                        />
+                        {g}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Affiche (URL) */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-white">URL de l'affiche</label>
+                <input
+                  type="url"
+                  value={editForm.posterUrl}
+                  onChange={(e) => setEditForm({ ...editForm, posterUrl: e.target.value })}
+                  className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                  placeholder="https://..."
+                />
+              </div>
+
+              {/* Synopsis */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-white">Synopsis</label>
+                <textarea
+                  rows={3}
+                  value={editForm.synopsis}
+                  onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
+                  className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none resize-none"
+                  placeholder="Résumé du film..."
+                />
+              </div>
+
+              {/* Pays & Réalisateur */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-white">Pays</label>
+                  <input
+                    type="text"
+                    value={editForm.country}
+                    onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-white">Réalisateur</label>
+                  <input
+                    type="text"
+                    value={editForm.director}
+                    onChange={(e) => setEditForm({ ...editForm, director: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Bande Annonce */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-white">Lien Bande annonce (YouTube)</label>
+                <input
+                  type="url"
+                  value={editForm.trailer}
+                  onChange={(e) => setEditForm({ ...editForm, trailer: e.target.value })}
+                  className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                  placeholder="https://youtube.com/..."
+                />
+              </div>
+
+              {/* Plateforme de streaming */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-white">Plateforme</label>
+                  <input
+                    type="text"
+                    value={editForm.platform}
+                    onChange={(e) => setEditForm({ ...editForm, platform: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                    placeholder="Netflix, Prime Video..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-white">Lien de la plateforme</label>
+                  <input
+                    type="url"
+                    value={editForm.platformLink}
+                    onChange={(e) => setEditForm({ ...editForm, platformLink: e.target.value })}
+                    className="w-full rounded-md border border-border bg-elevated p-2.5 text-sm text-white focus:border-accent/60 outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setEditingMovie(null)}
-                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:text-white"
+                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:text-white transition"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={submittingEdit}
-                  className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+                  className="rounded-md bg-accent px-5 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50 transition"
                 >
                   {submittingEdit ? "Enregistrement..." : "Enregistrer"}
                 </button>
