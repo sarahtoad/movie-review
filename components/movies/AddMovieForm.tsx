@@ -133,28 +133,37 @@ onChange={(v)=>handleChange("title",v)}
 
 <div>
   <label className="mb-2 block text-sm font-medium text-cream">
-    Genre
+    Genres <span className="text-red-500">*</span>
   </label>
-
-  <select
-  value={movie.genre}
-  onChange={(e) => handleChange("genre", e.target.value)}
-  className="w-full rounded-md border border-border bg-ink px-4 py-3 text-cream outline-none transition focus:border-accent/60"
->
-  <option value="">Sélectionnez un genre</option>
-
-  {GENRES.map((genre) => (
-    <option key={genre} value={genre}>
-      {genre}
-    </option>
-  ))}
-</select>
+  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto rounded-md border border-border bg-ink p-3">
+    {GENRES.map((g) => {
+      const isSelected = movie.genre?.includes(g); // Supposons que movie.genre est un tableau ou gère plusieurs valeurs
+      return (
+        <label key={g} className="flex items-center gap-2 text-sm text-cream cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              const currentGenres = Array.isArray(movie.genre) ? movie.genre : [];
+              const updated = e.target.checked
+                ? [...currentGenres, g]
+                : currentGenres.filter((item) => item !== g);
+              handleChange("genre", updated);
+            }}
+            className="rounded border-border text-accent focus:ring-0"
+          />
+          {g}
+        </label>
+      );
+    })}
+  </div>
 </div>
 
 
 
 <MovieField
 label="Année"
+required
 value={movie.year}
 placeholder="2024"
 onChange={(v)=>handleChange("year",v)}
@@ -167,6 +176,7 @@ onChange={(v)=>handleChange("year",v)}
 
 <MovieField
 label="Affiche"
+required
 value={movie.poster}
 placeholder="URL de l'image"
 onChange={(v)=>handleChange("poster",v)}
@@ -177,6 +187,7 @@ onChange={(v)=>handleChange("poster",v)}
 <MovieField
 label="Synopsis"
 type="textarea"
+required
 value={movie.synopsis}
 placeholder="Description du film..."
 onChange={(v)=>handleChange("synopsis",v)}
@@ -187,21 +198,52 @@ onChange={(v)=>handleChange("synopsis",v)}
 <div className="grid grid-cols-2 gap-4">
 
 
-<MovieField
-label="Durée"
-value={movie.duration}
-placeholder="150"
-onChange={(v)=>handleChange("duration",v)}
-/>
+{/* État local ou calcul pour heures et minutes */}
+<div className="grid grid-cols-2 gap-4">
+  <div>
+    <label className="mb-2 block text-sm font-medium text-cream">
+      Durée <span className="text-red-500">*</span>
+    </label>
+    <div className="grid grid-cols-2 gap-2">
+      <select
+        value={Math.floor(Number(movie.duration || 0) / 60)}
+        onChange={(e) => {
+          const hours = Number(e.target.value);
+          const currentTotal = Number(movie.duration || 0);
+          const currentMins = currentTotal % 60;
+          handleChange("duration", String(hours * 60 + currentMins));
+        }}
+        className="rounded-md border border-border bg-ink px-3 py-3 text-cream outline-none focus:border-accent/60"
+      >
+        {[0, 1, 2, 3, 4, 5].map((h) => (
+          <option key={h} value={h}>{h} h</option>
+        ))}
+      </select>
 
+      <select
+        value={Number(movie.duration || 0) % 60}
+        onChange={(e) => {
+          const mins = Number(e.target.value);
+          const currentTotal = Number(movie.duration || 0);
+          const hours = Math.floor(currentTotal / 60);
+          handleChange("duration", String(hours * 60 + mins));
+        }}
+        className="rounded-md border border-border bg-ink px-3 py-3 text-cream outline-none focus:border-accent/60"
+      >
+        {[0, 15, 30, 45].map((m) => (
+          <option key={m} value={m}>{m} min</option>
+        ))}
+      </select>
+    </div>
+  </div>
 
-
-<MovieField
-label="Pays"
-value={movie.country}
-placeholder="USA"
-onChange={(v)=>handleChange("country",v)}
-/>
+  <MovieField
+    label="Pays"
+    value={movie.country}
+    placeholder="USA"
+    onChange={(v) => handleChange("country", v)}
+  />
+</div>
 
 
 </div>
@@ -220,6 +262,7 @@ onChange={(v)=>handleChange("director",v)}
 <MovieField
 label="Bande annonce YouTube"
 value={movie.trailer}
+required
 placeholder="https://youtube.com/..."
 onChange={(v)=>handleChange("trailer",v)}
 />

@@ -3,11 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, Clock, Calendar, Film, ArrowLeft, Heart, Eye, MessageSquare, Send } from "lucide-react";
+import { Star, Clock, Calendar, ArrowLeft, Heart, Eye, MessageSquare, Send } from "lucide-react";
 
 interface Genre {
   id: string;
   name: string;
+}
+
+interface Platform {
+  name: string;
+  link: string;
 }
 
 interface Review {
@@ -30,6 +35,10 @@ interface MovieDetails {
   poster?: string;
   year: number;
   runtime?: number;
+  director?: string;
+  country?: string;
+  trailer?: string;
+  platforms?: Platform[];
   averageRating?: number;
   genres?: { genre: Genre }[] | Genre[];
   reviews?: Review[];
@@ -138,14 +147,15 @@ export default function MovieDetailPage() {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/movies/${movieId}/reviews`,
         {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          rating: newRating,
-          content: newComment,
-        }),
-      });
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            rating: newRating,
+            content: newComment,
+          }),
+        }
+      );
 
       if (res.ok) {
         const reviewAdded = await res.json();
@@ -187,12 +197,24 @@ export default function MovieDetailPage() {
     );
   }
 
-  // Normalize genre list formatting
+  // Formatting helper for genres
   const genreList = Array.isArray(movie.genres)
-    ? movie.genres.map((g: any) => g.genre?.name || g.name).filter(Boolean)
+    ? movie.genres.map((g: any) => g.genre?.name || g.name || g).filter(Boolean)
     : [];
 
   const posterSrc = movie.posterUrl || movie.poster || "/images/default-movie.jpg";
+
+  // Formatting helper for YouTube Trailer Embed URL
+  const getEmbedUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.includes("watch?v=")) {
+      return url.replace("watch?v=", "embed/");
+    }
+    if (url.includes("youtu.be/")) {
+      return url.replace("youtu.be/", "www.youtube.com/embed/");
+    }
+    return url;
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
@@ -238,7 +260,7 @@ export default function MovieDetailPage() {
               {movie.runtime && (
                 <span className="flex items-center gap-1.5">
                   <Clock size={16} />
-                  {movie.runtime} min
+                  {Math.floor(movie.runtime / 60)}h {movie.runtime % 60}min
                 </span>
               )}
             </div>
@@ -292,6 +314,59 @@ export default function MovieDetailPage() {
               {movie.synopsis || movie.description || "Aucun synopsis disponible pour ce film."}
             </p>
           </div>
+
+          {/* ======================================================== */}
+          {/* INFORMATIONS COMPLÉMENTAIRES (RÉALISATEUR, PAYS, PLATAFORME) */}
+          {/* ======================================================== */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 border-t border-border pt-6 text-sm">
+            {movie.director && (
+              <div>
+                <span className="block text-muted text-xs">Réalisateur</span>
+                <span className="font-semibold text-white">{movie.director}</span>
+              </div>
+            )}
+
+            {movie.country && (
+              <div>
+                <span className="block text-muted text-xs">Pays d'origine</span>
+                <span className="font-semibold text-white">{movie.country}</span>
+              </div>
+            )}
+
+            {movie.platforms && movie.platforms.length > 0 && (
+              <div>
+                <span className="block text-muted text-xs">Où regarder</span>
+                {movie.platforms.map((p, idx) => (
+                  <a
+                    key={idx}
+                    href={p.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-accent hover:underline block"
+                  >
+                    {p.name} ↗
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ======================================================== */}
+          {/* BANDE-ANNONCE YOUTUBE INTÉGRÉE */}
+          {/* ======================================================== */}
+          {movie.trailer && (
+            <div className="border-t border-border pt-6">
+              <h2 className="text-lg font-semibold text-white mb-3">Bande-annonce</h2>
+              <div className="aspect-video w-full overflow-hidden rounded-xl border border-border bg-surface">
+                <iframe
+                  src={getEmbedUrl(movie.trailer)}
+                  title="Bande annonce"
+                  className="h-full w-full"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
