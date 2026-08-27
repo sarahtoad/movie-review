@@ -351,6 +351,40 @@ export default function MovieDetailPage() {
             )}
           </div>
 
+
+          {/* ======================================================== */}
+          {/* link to watch it */}
+          {/* ======================================================== */}
+
+          {movie.platforms && movie.platforms.length > 0 && (
+  <div>
+    <span className="block text-muted text-xs mb-1">Où regarder</span>
+    <div className="space-y-2">
+      {movie.platforms.map((p, idx) => (
+        <div key={idx} className="flex flex-col">
+          <a
+            href={p.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-accent hover:underline inline-flex items-center gap-1"
+          >
+            {p.name} ↗
+          </a>
+          {/* Affichage explicite du lien */}
+          <a
+            href={p.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted hover:text-gray-300 break-all"
+          >
+            {p.link}
+          </a>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
           {/* ======================================================== */}
           {/* BANDE-ANNONCE YOUTUBE INTÉGRÉE */}
           {/* ======================================================== */}
