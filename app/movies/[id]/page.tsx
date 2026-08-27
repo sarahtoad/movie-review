@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, Clock, Calendar, ArrowLeft, Heart, Eye, MessageSquare, Send } from "lucide-react";
+import { Star, Clock, Calendar, ArrowLeft, Heart, Eye, MessageSquare, Send, ExternalLink } from "lucide-react";
 
 interface Genre {
   id: string;
@@ -12,7 +12,8 @@ interface Genre {
 
 interface Platform {
   name: string;
-  link: string;
+  link?: string;
+  url?: string;
 }
 
 interface Review {
@@ -89,13 +90,23 @@ export default function MovieDetailPage() {
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Une erreur est survenue.");
-      } finally {
+      } font-medium {
         setLoading(false);
       }
     }
 
     fetchMovieDetails();
   }, [movieId]);
+
+  // Helper pour garantir une URL valide avec protocole HTTP/HTTPS
+  const getValidUrl = (rawUrl?: string, platformName?: string, movieTitle?: string) => {
+    if (rawUrl && rawUrl.trim() !== "") {
+      return rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+    }
+    // Si l'URL est absente en BDD, génère un lien de recherche explicite
+    const query = encodeURIComponent(`regarder ${movieTitle || ""} ${platformName || ""}`);
+    return `https://www.google.com/search?q=${query}`;
+  };
 
   // Toggle Favorite Action
   async function toggleFavorite() {
@@ -315,10 +326,8 @@ export default function MovieDetailPage() {
             </p>
           </div>
 
-          {/* ======================================================== */}
-          {/* INFORMATIONS COMPLÉMENTAIRES (RÉALISATEUR, PAYS, PLATAFORME) */}
-          {/* ======================================================== */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 border-t border-border pt-6 text-sm">
+          {/* Informations complémentaires */}
+          <div className="grid grid-cols-2 gap-4 border-t border-border pt-6 text-sm">
             {movie.director && (
               <div>
                 <span className="block text-muted text-xs">Réalisateur</span>
@@ -332,62 +341,40 @@ export default function MovieDetailPage() {
                 <span className="font-semibold text-white">{movie.country}</span>
               </div>
             )}
-
-            {movie.platforms && movie.platforms.length > 0 && (
-              <div>
-                <span className="block text-muted text-xs">Où regarder</span>
-                {movie.platforms.map((p, idx) => (
-                  <a
-                    key={idx}
-                    href={p.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-accent hover:underline block"
-                  >
-                    {p.name} ↗
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
 
-
-          {/* ======================================================== */}
-          {/* link to watch it */}
-          {/* ======================================================== */}
-
+          {/* Section d'accès direct / Où regarder */}
           {movie.platforms && movie.platforms.length > 0 && (
-  <div>
-    <span className="block text-muted text-xs mb-1">Où regarder</span>
-    <div className="space-y-2">
-      {movie.platforms.map((p, idx) => (
-        <div key={idx} className="flex flex-col">
-          <a
-            href={p.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-accent hover:underline inline-flex items-center gap-1"
-          >
-            {p.name} ↗
-          </a>
-          {/* Affichage explicite du lien */}
-          <a
-            href={p.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted hover:text-gray-300 break-all"
-          >
-            {p.link}
-          </a>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+            <div className="border-t border-border pt-6">
+              <h2 className="text-lg font-semibold text-white mb-3">Où regarder</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {movie.platforms.map((p, idx) => {
+                  const targetUrl = getValidUrl(p.link || p.url, p.name, movie.title);
+                  return (
+                    <a
+                      key={idx}
+                      href={targetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 transition hover:border-accent hover:bg-elevated group"
+                    >
+                      <div className="overflow-hidden">
+                        <span className="font-semibold text-white group-hover:text-accent transition block truncate">
+                          {p.name}
+                        </span>
+                        <span className="text-xs text-muted block truncate">
+                          {targetUrl}
+                        </span>
+                      </div>
+                      <ExternalLink size={16} className="text-muted group-hover:text-accent shrink-0 ml-2" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          {/* ======================================================== */}
-          {/* BANDE-ANNONCE YOUTUBE INTÉGRÉE */}
-          {/* ======================================================== */}
+          {/* Bande-annonce */}
           {movie.trailer && (
             <div className="border-t border-border pt-6">
               <h2 className="text-lg font-semibold text-white mb-3">Bande-annonce</h2>
