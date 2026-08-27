@@ -1,6 +1,6 @@
 export interface AddMovie {
     title: string;
-    genre: string;
+    genre: string[];
     year: string;
     poster: string;
     synopsis: string;
