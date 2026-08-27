@@ -69,12 +69,12 @@ export default function MovieDetailPage() {
     if (!movieId) return;
 
     async function fetchMovieDetails() {
+      setLoading(true);
+      setError(null);
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/movies/${movieId}`,
-          {
-            credentials: "include",
-          }
+          { credentials: "include" }
         );
 
         if (!res.ok) {
@@ -87,9 +87,10 @@ export default function MovieDetailPage() {
         setMovie(movieData);
         setIsFavorite(movieData.isFavorite ?? false);
         setInWatchlist(movieData.inWatchlist ?? false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setError(err.message || "Une erreur est survenue.");
+        const msg = err instanceof Error ? err.message : "Une erreur est survenue.";
+        setError(msg);
       } finally {
         setLoading(false);
       }
@@ -98,27 +99,40 @@ export default function MovieDetailPage() {
     fetchMovieDetails();
   }, [movieId]);
 
-  // Helper pour garantir une URL valide avec protocole HTTP/HTTPS
   const getValidUrl = (rawUrl?: string, platformName?: string, movieTitle?: string) => {
     if (rawUrl && rawUrl.trim() !== "") {
       return rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     }
-    // Si l'URL est absente en BDD, génère un lien de recherche explicite
     const query = encodeURIComponent(`regarder ${movieTitle || ""} ${platformName || ""}`);
     return `https://www.google.com/search?q=${query}`;
   };
 
-  // Toggle Favorite Action
+  const getEmbedUrl = (url?: string) => {
+    if (!url) return "";
+    try {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = url.match(regExp);
+      if (match && match[2].length === 11) {
+        return `https://www.youtube.com/embed/${match[2]}`;
+      }
+    } catch {
+      // Fallback au traitement simple en cas d'erreur de parsing
+    }
+    return url;
+  };
+
   async function toggleFavorite() {
     try {
       const method = isFavorite ? "DELETE" : "POST";
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/favorites/${movieId}`,
-        {
-          method,
-          credentials: "include",
-        }
+        { method, credentials: "include" }
       );
+
+      if (res.status === 401) {
+        alert("Vous devez être connecté pour exécuter cette action.");
+        return;
+      }
 
       if (res.ok) {
         setIsFavorite(!isFavorite);
@@ -128,17 +142,18 @@ export default function MovieDetailPage() {
     }
   }
 
-  // Toggle Watchlist Action
   async function toggleWatchlist() {
     try {
       const method = inWatchlist ? "DELETE" : "POST";
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/watchlist/${movieId}`,
-        {
-          method,
-          credentials: "include",
-        }
+        { method, credentials: "include" }
       );
+
+      if (res.status === 401) {
+        alert("Vous devez être connecté pour exécuter cette action.");
+        return;
+      }
 
       if (res.ok) {
         setInWatchlist(!inWatchlist);
@@ -148,7 +163,6 @@ export default function MovieDetailPage() {
     }
   }
 
-  // Submit Review Action
   async function handleAddReview(e: React.FormEvent) {
     e.preventDefault();
     if (!newComment.trim()) return;
@@ -168,16 +182,27 @@ export default function MovieDetailPage() {
         }
       );
 
+      if (res.status === 401) {
+        alert("Vous devez être connecté pour laisser un avis.");
+        return;
+      }
+
       if (res.ok) {
         const reviewAdded = await res.json();
-        setMovie((prev) =>
-          prev
-            ? {
-                ...prev,
-                reviews: [reviewAdded, ...(prev.reviews || [])],
-              }
-            : null
-        );
+        setMovie((prev) => {
+          if (!prev) return null;
+          const updatedReviews = [reviewAdded, ...(prev.reviews || [])];
+          
+          // Re-calcul simple de la moyenne locale
+          const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
+          const newAvg = totalRating / updatedReviews.length;
+
+          return {
+            ...prev,
+            reviews: updatedReviews,
+            averageRating: newAvg,
+          };
+        });
         setNewComment("");
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -208,24 +233,11 @@ export default function MovieDetailPage() {
     );
   }
 
-  // Formatting helper for genres
   const genreList = Array.isArray(movie.genres)
     ? movie.genres.map((g: any) => g.genre?.name || g.name || g).filter(Boolean)
     : [];
 
   const posterSrc = movie.posterUrl || movie.poster || "/images/default-movie.jpg";
-
-  // Formatting helper for YouTube Trailer Embed URL
-  const getEmbedUrl = (url?: string) => {
-    if (!url) return "";
-    if (url.includes("watch?v=")) {
-      return url.replace("watch?v=", "embed/");
-    }
-    if (url.includes("youtu.be/")) {
-      return url.replace("youtu.be/", "www.youtube.com/embed/");
-    }
-    return url;
-  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
@@ -254,7 +266,6 @@ export default function MovieDetailPage() {
           <div>
             <h1 className="text-3xl font-bold text-white sm:text-4xl">{movie.title}</h1>
             
-            {/* Metadata Tags */}
             <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-muted">
               <span className="flex items-center gap-1.5 text-yellow-400 font-semibold">
                 <Star size={16} fill="currentColor" />
@@ -431,7 +442,7 @@ export default function MovieDetailPage() {
           <button
             type="submit"
             disabled={submittingReview}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
             <Send size={16} />
             {submittingReview ? "Publication..." : "Publier l'avis"}

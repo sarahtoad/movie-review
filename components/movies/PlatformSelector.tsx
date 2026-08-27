@@ -17,7 +17,6 @@ export default function PlatformSelector({
   setPlatform,
   setLink,
 }: Props) {
-  // Détermine si la plateforme actuelle est une option personnalisée ("Autre")
   const isCustomPlatform =
     platform !== "" && !PRESET_PLATFORMS.includes(platform);
 
@@ -28,7 +27,8 @@ export default function PlatformSelector({
     isCustomPlatform ? platform : ""
   );
 
-  // Synchronise l'état local si le parent réinitialise le formulaire
+  // Synchronise l'état local uniquement lorsque le parent réinitialise le formulaire
+  // ou si la valeur de la plateforme provient de l'extérieur (ex: chargement d'édition)
   useEffect(() => {
     if (!platform) {
       setSelectedOption("");
@@ -47,6 +47,7 @@ export default function PlatformSelector({
     setSelectedOption(val);
 
     if (val === "Autre") {
+      // Garde le customName existant ou réinitialise à chaîne vide pour la nouvelle saisie
       setPlatform(customName);
     } else {
       setPlatform(val);
@@ -79,7 +80,7 @@ export default function PlatformSelector({
             <option value="Autre">Autre (Saisir un nom...)</option>
           </select>
 
-          {/* Saisie personnalisée visible uniquement si "Autre" est sélectionné */}
+          {/* Saisie personnalisée visible si "Autre" est sélectionné */}
           {selectedOption === "Autre" && (
             <input
               type="text"
