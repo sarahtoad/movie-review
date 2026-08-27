@@ -90,7 +90,7 @@ export default function MovieDetailPage() {
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Une erreur est survenue.");
-      } font-medium {
+      } finally {
         setLoading(false);
       }
     }
